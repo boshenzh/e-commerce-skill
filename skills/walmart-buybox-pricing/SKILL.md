@@ -14,8 +14,8 @@ A **spoke** of the `walmart-seller` hub. Read the hub first for auth, the API ma
 ## When to use / when not
 
 - **Use** to win/recover the Buy Box, stand up a repricing strategy, or decide whether a specific price is safe to set.
-- **Not** for listing content/SEO (`walmart-listings`, `walmart-seo`), inventory pushes (DXM owns those), or ad bidding (`walmart-advertising`).
-- **Coexistence:** if **DXM** also writes price, you will *flap* (each system reverts the other). Detect the conflict and suspend the agent's writes for that SKU — see Gotchas.
+- **Not** for listing content/SEO (`walmart-listings`, `walmart-seo`), inventory & fulfillment (`walmart-fulfillment-ops`), or ad bidding (`walmart-advertising`).
+- **Single source of truth:** the agent is the system of record for Walmart price writes and owns them end-to-end. (If you ever add another tool that also writes to Walmart, partition fields per system to avoid oversell / double-write / price-flapping.)
 
 ## How the Buy Box is actually won
 
@@ -48,7 +48,7 @@ Never deviate. Every price write — Repricer min/max OR direct `PUT /v3/price` 
    ```bash
    python3 ../walmart-seller/scripts/wm_request.py PUT /v3/price --body @price.json
    ```
-5. **Read back after ~5 min** (price writes take ~5 min to reflect). Confirm it stuck and **wasn't reverted by DXM**. If reverted → conflict tripwire: suspend the agent's writes for that SKU and surface to a human.
+5. **Read back after ~5 min** (price writes take ~5 min to reflect). Confirm the new price stuck. If it didn't reflect (phantom success), don't re-write blindly — re-read, then surface to a human if it keeps reverting.
 
 ## Hard rules (full text: [`../walmart-seller/references/guardrails.md`](../walmart-seller/references/guardrails.md))
 
@@ -81,6 +81,5 @@ python3 ../walmart-seller/scripts/guardrail_check.py --sku ABC --proposed 10 \
 - **A runaway DOWNWARD repricer trips "Pricing Error" suppression.** Too-low is dangerous, not only too-high. Always set a real `min`; never let the strategy chase to zero.
 - **Write limits are tight** — single `PUT /v3/price` 100/hr, bulk `PRICE_AND_PROMOTION` feed 10/hr. Prefer the native Repricer so you stop spending writes.
 - **`PUT /v3/price` takes ~5 min to reflect.** Don't re-write or assume failure before reading back; you'll burn the rate budget and may double-move the price.
-- **If DXM also writes price, you'll flap.** Detect divergence on read-back; on conflict, suspend the agent's writes for that SKU rather than fighting (you'll both lose and may suppress the SKU).
 - **Never chase below your floor.** When the competitive floor < your `min`, hold at `min` and accept the Buy Box loss — a lost box is recoverable; a suppressed SKU or suspended account is not.
 - **Repricer create-body field names are unverified** (the portal is a JS SPA) — confirm exact `minimumSellerAllowedPrice`/`maximumSellerAllowedPrice` spellings against a live sandbox call before coding.

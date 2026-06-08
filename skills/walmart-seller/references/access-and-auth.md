@@ -9,12 +9,12 @@ Full version: `../../../docs/01-access-paths-and-connected-apps.md`.
 | **A** | **Your own first‑party API keys** (`client_credentials`) | none | ✅ use this |
 | B | Solution‑Provider OAuth app ("Connected App") | Walmart contract + ~3–5 wk | only to sell software to other sellers |
 | C | Legacy Delegated Access keys | provider contract | ❌ retiring (no new after 2026‑07‑30; dead 2026‑10‑01) |
-| D | Through DianXiaoMi | — | ❌ DXM has no open API |
+| D | Through an existing third‑party connected app | — | ❌ dead end if it has no open API |
 | E | Browser/UI automation | — | ⚠️ last resort, ToS‑sensitive |
 | F | 3rd‑party MCP/platform (Vinkius, CedCommerce…) | vendor | convenience layer only |
 | G | Walmart Connect ads API | WCPN partner | separate (`walmart-advertising`) |
 
-**Connected Apps** (`seller.walmart.com/apps/connected-apps`) = third‑party Solution‑Provider apps you OAuth‑authorized (DianXiaoMi is one). You do **not** need to be one to automate your own shop.
+**Connected Apps** (`seller.walmart.com/apps/connected-apps`) = third‑party Solution‑Provider apps you OAuth‑authorized. You do **not** need to be one to automate your own shop.
 
 ## Generate your own keys
 

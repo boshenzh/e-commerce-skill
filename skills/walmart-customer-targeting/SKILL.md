@@ -28,7 +28,7 @@ Visibility compounds: **speed + price + content → Buy Box + higher search rank
 1. **Fast/free shipping tag — usually the fastest single win.** Walmart+ shoppers filter hard on delivery speed and a TwoDay/free badge. Either enroll SKUs in **WFS** (Walmart fulfills; auto-earns the fast tag) or set a **TwoDay shipping template** on seller-fulfilled SKUs (`/v3/settings/shipping/templates`). → `walmart-wfs`.
 2. **Accurate, low lag time.** A truthful, short `lagtime` lets Walmart promise (and keep) a faster delivery date — over-promising tanks On-Time Delivery. Set via feed `lagtime` or `GET /v3/lagtime`. → `walmart-wfs`.
 3. **Competitive landed price to win the Buy Box.** Item **+ shipping** must beat the reference price; the Buy Box winner is what shoppers actually see and buy. → `walmart-buybox-pricing`.
-4. **High in-stock rate.** Out-of-stock = invisible. Monitor the **Inventory OOS** webhook event; DXM owns the inventory push. → hub `../walmart-seller/SKILL.md`.
+4. **High in-stock rate.** Out-of-stock = invisible. Watch the **Inventory OOS** webhook event; the agent owns the inventory push end-to-end (`GET|PUT /v3/inventories/{sku}`). → hub `../walmart-seller/SKILL.md`.
 5. **Strong Listing Quality + reviews.** Higher LQ score and ratings lift search rank and conversion. Check `GET /v3/insights/items/listingQuality/score`. → `walmart-seo`.
 6. **Participate in Walmart Deals / savings events.** Featured-deal placement is extra exposure — but requires **enrollment in Seller Center** (no self-serve "join event" marketplace endpoint). → `walmart-buybox-pricing` for the deal/promo price mechanics.
 7. **Geo-relevant fulfillment.** Ship nodes near demand → faster *promised* delivery → more "fast delivery" impressions. Configure `/v3/settings/shipping/shipnodes` (multi-node inventory via `GET|PUT /v3/inventories/{sku}`). → `walmart-wfs`.
@@ -41,7 +41,7 @@ No live calls here; this skill reasons over data the spokes/hub fetch. The decis
 IF sku has no fast/free tag        → fix shipping first (WFS or TwoDay template)   [walmart-wfs]
 ELIF not winning Buy Box           → fix landed price                              [walmart-buybox-pricing]
 ELIF Listing Quality < good        → fix content/reviews                          [walmart-seo]
-ELIF in-stock rate low / OOS       → fix inventory (DXM owns push)                 [hub]
+ELIF in-stock rate low / OOS       → fix inventory (agent owns the push)           [hub]
 ELSE                               → enroll in Walmart Deals / add ship nodes
 ```
 
@@ -58,7 +58,7 @@ python3 ../walmart-seller/scripts/wm_request.py GET /v3/insights/items/listingQu
 - **Fastest single win is almost always the shipping tag** (WFS enrollment or a TwoDay template), not a price cut. Try that lever before repricing.
 - **Walmart Deals / events require Seller Center enrollment** — there is no self-serve marketplace endpoint to "join an event." Don't promise programmatic enrollment.
 - **A faster promised date you can't keep backfires.** Lag time must be honest: missing it breaks On-Time Delivery (**≥ 90%**) and Late Shipment (**≤ 5%**) on the scorecard, which *lowers* visibility. See [`../walmart-seller/references/guardrails.md`](../walmart-seller/references/guardrails.md).
-- **This skill is advisory only.** It picks the lever; the **API work happens in the spokes** (`walmart-wfs`, `walmart-buybox-pricing`, `walmart-seo`). Route there — don't duplicate their writes here, and don't fight DXM on inventory.
+- **This skill is advisory only.** It picks the lever; the **API work happens in the spokes** (`walmart-wfs`, `walmart-buybox-pricing`, `walmart-seo`). Route there — don't duplicate their writes here. **Single source of truth — the agent is the system of record for Walmart writes.** (If you ever add another tool that also writes to Walmart, partition fields per system to avoid oversell / double-write / price-flapping.)
 - **Any price move to "win Buy Box" is a guarded write.** Before *any* price write, the spoke must read [`../walmart-seller/references/guardrails.md`](../walmart-seller/references/guardrails.md) and run `../walmart-seller/scripts/guardrail_check.py` (too-low prices get suppressed too).
 
 ## Load deeper

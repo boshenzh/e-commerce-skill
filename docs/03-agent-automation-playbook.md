@@ -5,30 +5,31 @@ Each automation is written as an **agent loop**: *trigger → read → decide �
 **Cross‑cutting rules that apply to every loop:**
 - **Phantom success:** a `200`/`202` does **not** mean the change is live. After any write, **wait ~60 s, read back, confirm**, then mark the intent `CONFIRMED`.
 - **Idempotency:** every write carries a deterministic key `hash(sku + field + target + intentId)`; persist `intent → feedId` so retries never double‑submit.
-- **Respect ownership:** DianXiaoMi owns inventory push, fulfillment, and order state. The agent must not write those fields routinely (see `06`).
+- **Single source of truth:** the agent is the system of record for Walmart writes — listings, price, inventory, orders, returns, and WFS — and owns them end‑to‑end. *(Optional: if you ever add another tool that also writes to Walmart, partition fields per system to avoid oversell / double‑write / price‑flapping.)*
 - **Rate budgeting:** writes are scarce (`PUT /v3/price` 100/hr; bulk feeds 10/hr; order actions 60/min). Batch, schedule, prioritize.
 
 ---
 
-## ⭐ Priority 1 — Order → ERP fulfillment sync
+## ⭐ Priority 1 — Order fulfillment
 
-**Goal:** never miss the 4‑hour acknowledge SLA or the Expected‑Ship‑Date auto‑cancel; keep tracking flowing; surface exceptions. **DXM owns the actual ack/ship**, so the agent is a **monitor + exception handler + analyst**, not the fulfiller (writing ack/ship from the agent would double‑fulfill).
+**Goal:** never miss the 4‑hour acknowledge SLA or the Expected‑Ship‑Date auto‑cancel; keep tracking flowing; surface exceptions. **The agent owns fulfillment end‑to‑end** — it acknowledges, ships, cancels, and refunds against Walmart directly.
 
 ```
 Trigger:  PO-created webhook  (+ GET /v3/orders/released poll every 5–15 min as reconciliation safety net)
 Read:     GET /v3/orders/{poId}  → line items, expectedShipDate, shipNodeType
-Decide:   • Is DXM ingesting + acknowledging within SLA?  (compare order ledger vs status)
-          • Any line approaching ExpectedShipDate without tracking?  → escalate
-          • Any cancel/refund/return events?  → log + alert
-Write:    (none by default — DXM ships). Optional Phase-2+ exception writes are human-gated:
-          POST …/cancel (true OOS), POST …/refund — only with approval.
+Decide:   • Acknowledge each released order within the 4-hr SLA.
+          • Any line approaching ExpectedShipDate?  → ship with label + tracking before ESD.
+          • Any cancel/refund/return events?  → action + log.
+Write:    POST …/acknowledge  → POST …/shipping (carrier + tracking) before ESD.
+          POST …/cancel (true OOS), POST …/refund — large/exceptional cases human-gated.
 Verify:   GET /v3/orders/{poId} status transitions; alert on stalls.
 ```
 
 - **Read tools:** `get_orders`, `get_order`, `get_returns`, `list_notifications`.
-- **Decision points:** SLA risk (ack <4 hr; ship by ESD; auto‑cancel at ESD+4 days), mismatch between Walmart state and DXM's expected progress, valid‑tracking gaps.
-- **Guardrails:** agent does **not** acknowledge/ship/cancel routinely; those stay with DXM. Any agent‑initiated cancel/refund is a Phase‑2 human‑gated exception.
-- **Value:** protects On‑Time Shipping / Valid Tracking Rate scorecard metrics; turns silent SLA misses into proactive alerts.
+- **Decision points:** SLA risk (ack <4 hr; ship by ESD; auto‑cancel at ESD+4 days), tracking gaps, which cancels/refunds are routine vs need approval.
+- **Fulfillment plumbing:** a standalone agent must produce shipping labels + tracking to ship — use Walmart's carrier/label APIs or your 3PL — and feed real tracking numbers back on the ship call.
+- **Guardrails:** agent acknowledges/ships routinely; large or exceptional cancels/refunds stay human‑gated.
+- **Value:** protects On‑Time Shipping / Valid Tracking Rate scorecard metrics; turns silent SLA misses into proactive action.
 
 ---
 
@@ -45,12 +46,12 @@ Decide:   target = clamp(competitive_target, [min, max])
           • If no competitive target → hold last submitted price
 Write:    Preferred: POST /v3/repricer/strategy (Competitive) + assign SKUs with min/max  (≈20/hr)
           Fallback:  PUT /v3/price (100/hr) or PRICE_AND_PROMOTION feed (10/hr) within [min,max]
-Verify:   read-back price after ~5 min; watch for DXM overwriting it (conflict tripwire).
+Verify:   read-back price after ~5 min; confirm it stuck at the submitted value.
 ```
 
 - **Read tools:** `get_buybox_status`, `get_item`, `get_price`, unpublished‑item reasons.
 - **Decision points:** clamp to `[min,max]`; never below floor; per‑cycle %‑change cap; cooldown per SKU; SKU allowlist.
-- **Guardrails (hard):** mandatory per‑SKU min/max; never below cost/MAP; large moves → human approval; conflict tripwire if DXM pushes the price back (suspend agent writes on that SKU). See `05`.
+- **Guardrails (hard):** mandatory per‑SKU min/max; never below cost/MAP; large moves → human approval; read‑back tripwire if the submitted price doesn't stick (suspend agent writes on that SKU and alert). See `05`.
 - **Why native Repricer first:** real‑time per‑SKU repricing across a big catalog is impossible under 100/hr·10/hr write limits; the native engine reprices within your bounds server‑side at 15 min–4 hr cadence.
 
 ---
@@ -81,23 +82,25 @@ Verify:   poll GET /v3/feeds/{feedId}?includeDetails=true (per-item ingestionSta
 
 ## ⭐ Priority 4 — Inventory sync & health
 
-**Goal:** keep Walmart inventory accurate (DXM is the writer), catch drift, react to OOS, and monitor account health + finances.
+**Goal:** keep Walmart inventory accurate (the agent is the writer), catch drift, react to OOS, and monitor account health + finances.
 
 ```
 Trigger:  Inventory-OOS webhook | nightly full sweep | settlement-ready
 Read:     GET /v3/inventories (all SKUs/nodes) | GET /v3/fulfillment/inventory (WFS ATS)
           Seller Performance summaries; recon report (availableReconFiles → reconFileJson)
-Decide:   • Drift: does live Walmart qty match expected (from order/restock ledger)? → flag
-          • OOS on a SKU that should have stock? → alert (DXM likely needs to push)
+Decide:   • Drift: does live Walmart qty match the source-of-truth stock? → correct
+          • OOS on a SKU that should have stock? → push the correct qty
           • Scorecard nearing a threshold? → alert with root cause
           • Settlement vs expected (fees/refunds/payout)? → reconciliation report
-Write:    (none by default — DXM owns inventory push). Emergency OOS correction = human-gated.
-Verify:   re-read after any correction; reconcile ledger.
+Write:    PUT /v3/inventory (per SKU) | MP_INVENTORY feed (bulk) — push corrected quantities.
+          Large/exceptional corrections human-gated.
+Verify:   re-read after any write; reconcile ledger.
 ```
 
 - **Read tools:** `get_inventory`, `get_wfs_inventory`, `get_seller_performance`, `get_reconciliation`.
 - **Decision points:** drift threshold, which OOS is real vs lag, scorecard early‑warning, settlement variance.
-- **Guardrails:** routine inventory writes stay with DXM (avoid oversell from two writers); emergency corrections are explicit, logged, human‑approved.
+- **Inventory source of truth:** a standalone agent needs a real stock feed to push from — your own warehouse/3PL on‑hand quantities — reconciled against Walmart on every sweep; the agent owns the push to Walmart end‑to‑end.
+- **Guardrails:** all per‑SKU min/max, per‑cycle change caps, and read‑back verification still apply; large/exceptional corrections are explicit, logged, human‑approved.
 - **Value:** prevents oversell/undersell, protects Cancellation Rate (a scorecard metric), and catches fee/refund leakage in settlements.
 
 ---
@@ -120,11 +123,11 @@ Verify:   re-read after any correction; reconcile ledger.
 
 | Always read‑only (safe) | Gated writes (approval) |
 |---|---|
-| get orders / order / returns | acknowledge / ship (DXM owns — agent normally never) |
+| get orders / order / returns | acknowledge / ship (agent owns) |
 | get item / inventory / price / buybox | update price / submit price feed |
 | listing quality / unpublished reasons | submit item / maintenance feed |
 | reports / insights / settlement | cancel / refund order lines |
 | list notifications | issue return refund |
-| reconciliation drift | inventory correction (DXM owns — emergency only) |
+| reconciliation drift | inventory push / correction (agent owns) |
 
 The MCP/tool layer enforces this split structurally (`04`).

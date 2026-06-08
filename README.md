@@ -1,6 +1,6 @@
 # e-commerce-skill
 
-A collection of **OpenClaw skills** for running marketplace seller stores. v0.1 is a **Walmart Marketplace (US)** suite, built on the bundled research library in [`docs/`](docs/README.md). It is designed to run **alongside an ERP like DianXiaoMi** (which owns inventory push + fulfillment), with the agent adding a Walmart‑native intelligence + guarded‑write layer.
+A collection of **OpenClaw skills** for running marketplace seller stores. v0.1 is a **Walmart Marketplace (US)** suite, built on the bundled research library in [`docs/`](docs/README.md). It is a **standalone Walmart seller agent** that owns the whole Walmart store: it is the **system of record for all Walmart writes** — listings, price, inventory, orders (acknowledge / ship / cancel / refund), returns, and WFS — adding a Walmart‑native intelligence + guarded‑write layer on top.
 
 ## Design: hub‑and‑spoke
 
@@ -24,6 +24,8 @@ Around it, focused **spokes** — one per job‑to‑be‑done:
 | `walmart-product-research` | find winning products (爆款) via demand signals | operational |
 
 **Start at `walmart-seller`** — it routes you to the right spoke and holds the credentials + guardrails everything else depends on.
+
+Because the agent owns inventory and fulfillment end‑to‑end, a standalone deployment needs two things of its own: (a) a real source of inventory truth — your own warehouse/3PL stock — to push to Walmart, and (b) a way to produce shipping labels + tracking (Walmart's carrier/label APIs or a 3PL).
 
 ## Install (OpenClaw)
 
@@ -61,6 +63,7 @@ Smoke‑test auth: `python3 skills/walmart-seller/scripts/get_token.py` (or the 
 - Format: `SKILL.md` + YAML frontmatter (`name` = folder, `description` with inline triggers, `version`), `references/` for deep docs, `scripts/` (Python stdlib — no pip installs).
 - Tone: imperative, second‑person, with explicit **Gotchas**.
 - Safety‑first: any price/inventory/cancel write must pass the hub's guardrails (`walmart-seller/references/guardrails.md` + `scripts/guardrail_check.py`).
+- Single source of truth — the agent is the system of record for Walmart writes. (Optional: if you ever add another tool that also writes to Walmart, partition fields per system to avoid oversell / double‑write / price‑flapping.)
 
 ## Relationship to `docs/`
 
@@ -68,4 +71,4 @@ The bundled [`docs/`](docs/) is the **research library** (full API reference, ac
 
 ## Roadmap
 
-v0.1 = Walmart. The structure is marketplace‑agnostic; future siblings (`amazon-*`, `tiktok-shop-*`, an ERP‑bridge skill) can drop in alongside `walmart-*`.
+v0.1 = Walmart. The structure is marketplace‑agnostic; future siblings (`amazon-*`, `tiktok-shop-*`) can drop in alongside `walmart-*`.

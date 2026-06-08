@@ -14,7 +14,7 @@ Create or repair listings on Walmart Marketplace (US). Listings are **feed-based
 ## When to use / when not to
 
 - **Use** to create a listing (new or offer-only match), optimize title/attribute content, bulk-upload, or diagnose why items are unpublished.
-- **Not** for price or inventory — those have their **own feeds** and route to `walmart-buybox-pricing` and DXM respectively. Not for pure search-rank tactics (`walmart-seo`).
+- **Not** for price or inventory — those have their **own feeds** and route to `walmart-buybox-pricing` and the inventory feed respectively (the agent owns both end-to-end). Not for pure search-rank tactics (`walmart-seo`).
 - **Read first** for exact endpoints/limits: [`../walmart-seller/references/api-reference.md`](../walmart-seller/references/api-reference.md). For content/IP/pricing-suppression rules: [`../walmart-seller/references/guardrails.md`](../walmart-seller/references/guardrails.md).
 
 ## Workflow (PRESCRIPTIVE — follow the sequence; the async parts bite if you skip a step)
@@ -71,7 +71,7 @@ Returns:
 - **`PROCESSED` ≠ `PUBLISHED`.** Always re-read `GET /v3/items/{sku}` `publishedStatus`; never call a listing live off feed status.
 - **A `PROCESSED` feed can hide failed items.** Walk every per-item `ingestionStatus` before declaring success — don't trust the top-level feed status.
 - **Country of Origin is sticky.** Once set, it **cannot** be changed via `MP_MAINTENANCE` — you must `DELETE /v3/items/{sku}`, **wait 48 h**, then recreate (verify current requirements). Get it right the first time.
-- **Price and inventory have their OWN feeds**, not item maintenance: price → `PRICE_AND_PROMOTION` / `walmart-buybox-pricing`; inventory → DXM. Don't try to fix a "Pricing Error" with an `MP_ITEM` feed.
+- **Price and inventory have their OWN feeds**, not item maintenance: price → `PRICE_AND_PROMOTION` / `walmart-buybox-pricing`; inventory → the inventory feed (the agent owns both, pushing quantities from your own warehouse/3PL stock truth). Don't try to fix a "Pricing Error" with an `MP_ITEM` feed.
 - **`MP_ITEM` and `PRICE_AND_PROMOTION` share the ~10/hr feed budget** — bulk item submits and bulk price submits draw from the same throttle, so sequence them.
 - **Rich media isn't in the feed.** A clean `MP_ITEM` feed gets you the standard listing only; video/360° is a separate post-create step.
 

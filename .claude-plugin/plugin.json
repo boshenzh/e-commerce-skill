@@ -1,7 +1,7 @@
 {
   "name": "e-commerce-skill",
   "version": "0.1.0",
-  "description": "Marketplace seller-store skills for OpenClaw. v0.1 ships a Walmart Marketplace (US) suite: a walmart-seller hub (own-keys auth, condensed API map, account-safety guardrails, runnable Python helpers) plus focused spokes — onboarding/approval, listing creation & optimization, search SEO, WFS fulfillment, Walmart Connect advertising, Buy Box & repricing, Pro Seller badge, Walmart+ customer targeting, fulfillment ops, and product research (finding 爆款). Designed to sit alongside an ERP like DianXiaoMi, not replace it. Built on the research library in ../docs.",
+  "description": "Marketplace seller-store skills for OpenClaw. v0.1 ships a Walmart Marketplace (US) suite: a walmart-seller hub (own-keys auth, condensed API map, account-safety guardrails, runnable Python helpers) plus focused spokes — onboarding/approval, listing creation & optimization, search SEO, WFS fulfillment, Walmart Connect advertising, Buy Box & repricing, Pro Seller badge, Walmart+ customer targeting, fulfillment ops, and product research (finding 爆款). A standalone Walmart Marketplace seller agent. Built on the research library in ../docs.",
   "author": "boshenzh",
   "license": "Apache-2.0",
   "repository": "boshenzh/e-commerce-skill",

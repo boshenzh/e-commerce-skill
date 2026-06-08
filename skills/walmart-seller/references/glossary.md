@@ -5,7 +5,7 @@
 | **Seller Center** | Walmart's seller console (`seller.walmart.com`). |
 | **Developer Portal** | `developer.walmart.com` — API docs/reference + key‑management entry. |
 | **Marketplace API** | Seller REST API (`marketplace.walmartapis.com/v3/...`). |
-| **Solution Provider** | Walmart‑approved third‑party software vendor (DianXiaoMi is one). |
+| **Solution Provider** | Walmart‑approved third‑party software vendor. |
 | **Connected App** | A Solution‑Provider app a seller OAuth‑authorized to act on their account. |
 | **Delegated Access** | Legacy per‑provider scoped keys. Retiring 2026‑10‑01. |
 | **client_credentials** | OAuth2 grant for a seller's own keys → 15‑min access token. |
@@ -26,6 +26,5 @@
 | **Walmart+** | Walmart's membership program (free fast shipping); a high‑value audience. |
 | **Walmart Connect / WCPN** | Walmart's ad business / its partner network gating the ads API. |
 | **Scorecard** | Seller performance metrics (OTD/VTR/cancellation/etc.). |
-| **DXM** | DianXiaoMi (店小秘) — the user's ERP; an API consumer with no open API. |
 | **MAP** | Minimum Advertised Price — a floor the agent must never price below. |
 | **爆款** | "Hot/winning product" — a high‑demand best‑seller (product‑research target). |

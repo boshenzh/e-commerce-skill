@@ -1,0 +1,31 @@
+{
+  "name": "e-commerce-skill",
+  "owner": {
+    "name": "boshenzh"
+  },
+  "metadata": {
+    "description": "Marketplace seller-store skills for OpenClaw — a standalone Walmart Marketplace (US) suite.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "e-commerce-skill",
+      "description": "Standalone Walmart Marketplace OpenClaw skill suite: a walmart-seller hub (own-keys auth, condensed API map, account-safety guardrails, runnable Python helpers) + 10 spokes (onboarding, listings, seo, wfs, advertising, buybox-pricing, pro-seller, customer-targeting, fulfillment-ops, product-research). Sandbox-verified.",
+      "author": {
+        "name": "boshenzh"
+      },
+      "repository": "boshenzh/e-commerce-skill",
+      "tags": [
+        "walmart",
+        "ecommerce",
+        "marketplace",
+        "seller",
+        "api"
+      ],
+      "source": {
+        "source": "github",
+        "repo": "boshenzh/e-commerce-skill"
+      }
+    }
+  ]
+}

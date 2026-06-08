@@ -12,11 +12,12 @@ Full version with payloads: `../../../docs/02-walmart-api-reference.md`. Base ho
 - `GET /v3/feeds/{feedId}?includeDetails=true` — poll; `RECEIVED→INPROGRESS→PROCESSED|ERROR`; walk per‑item `ingestionStatus`.
 - `GET /v3/items` (paginate with `nextCursor=*`, or `limit`+`offset`; `limit=1` works for a quick probe) / `GET /v3/items/{id}` / `DELETE /v3/items/{sku}` (retire). **Feed PROCESSED ≠ item PUBLISHED** — verify `publishedStatus`. Response: `ItemResponse[]` with `sku`, `wpid`, `upc/gtin`, `productName`, `productType`, `price`, `publishedStatus`, `unpublishedReasons`.
 
-## Inventory (DXM owns this — read‑mostly here)
+## Inventory (agent owns — keep one source of truth)
+- The agent owns inventory end‑to‑end: pull stock from your real source of truth (your own warehouse/3PL on‑hand) and push it to Walmart via these endpoints.
 - `PUT /v3/inventory?sku=` `{quantity:{unit:"EACH",amount}}` (~200/min) · `GET /v3/inventory`.
 - Multi‑node: `GET|PUT /v3/inventories/{sku}` · `GET /v3/inventories`.
 - Bulk feeds: `feedType=inventory` (single node, 10/hr) · `MP_INVENTORY` (multi, ~50/hr).
-- WFS inventory **read‑only**: `GET /v3/fulfillment/inventory` (ATS).
+- WFS inventory (held by Walmart): `GET /v3/fulfillment/inventory` (ATS) — read for ATS; the agent owns the seller‑fulfilled quantities above.
 - Lag time: feed `lagtime` · `GET /v3/lagtime`.
 
 ## Price / Promotions / Repricer
@@ -25,7 +26,8 @@ Full version with payloads: `../../../docs/02-walmart-api-reference.md`. Base ho
 - Native **Repricer** `/v3/repricer/strategy` (create ~20/hr; assign/unassign/pause) — rule types Buy Box / External / **Competitive (Walmart‑recommended)**, plus an optional eligibility‑gated AI strategy; **per‑item `minimumSellerAllowedPrice` + `maximumSellerAllowedPrice` mandatory**; 15 min–4 hr cadence. (`PUT /v3/price` may take ~5 min to reflect.)
 - Promo prices: `GET /v3/promo/sku/{sku}`.
 
-## Orders (DXM owns fulfillment — monitor here)
+## Orders (agent owns fulfillment)
+- The agent owns the order lifecycle end‑to‑end: acknowledge, ship, cancel, refund. To ship, you need to produce shipping labels + tracking — via Walmart's seller‑fulfilled carrier/label APIs (`/v3/settings/shipping/{carriers,templates}`) or your 3PL — and feed the resulting `trackingNumber`/`carrierName` into the shipping call below.
 - `GET /v3/orders/released?createdStartDate=YYYY-MM-DD` (work queue, `createdStartDate` required, 60/min) · `GET /v3/orders` (all, cursor, 5000/min) · `GET /v3/orders/{poId}`. Response: `list.meta.{totalCount,limit,nextCursor}` + `list.elements.order[]`.
 - Actions (60/min each): `POST …/acknowledge` (SLA **4 hr**), `POST …/shipping` (tracking: `shipDateTime` epoch‑ms, **`carrierName` is an object** `{"carrier":"UPS"}` or `{"otherCarrier":"…"}`, `methodCode`, `trackingNumber`; same call edits), `POST …/cancel`, `POST …/refund` (negative amounts).
 - Auto‑cancel if not shipped by Expected Ship Date + 4 days.

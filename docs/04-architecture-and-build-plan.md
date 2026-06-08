@@ -1,6 +1,6 @@
 # 04 — Architecture & Phased Build Plan
 
-How the agent, an MCP/tool layer, and DianXiaoMi fit together — and a step‑by‑step rollout from read‑only analytics to supervised autonomy.
+How the agent and an MCP/tool layer fit together — and a step‑by‑step rollout from read‑only analytics to supervised autonomy. The agent is the **system of record** for the Walmart store and owns all writes.
 
 ## Reference architecture
 
@@ -15,29 +15,29 @@ Walmart Notifications (webhooks) ─┐         ┌─ Walmart Marketplace REST 
                             │  • reconciliation sweeps       │────▶│  READ tools  (always on)  │──┘
                             │  • decision + audit store      │     │  WRITE tools (dry-run +   │
                             └───────────────┬────────────────┘     │   approval token)         │
-                                            │ proposes / alerts     └──────────────────────────┘
+                                            │ proposes / acts       └──────────────────────────┘
                                             ▼
                                    AI agent (any runtime)
-
-   DianXiaoMi (unchanged) ── owns inventory push, fulfillment, procurement ── runs ALONGSIDE
 ```
 
-The agent uses **Path A keys**, sits **alongside** DXM, is **read‑mostly**, and writes to Walmart only through narrow, idempotent, human‑gated tools (or the native Repricer).
+The agent uses **Path A keys**, is the **system of record** for the Walmart store, and writes to Walmart through narrow, idempotent, guardrailed tools (gated by approval in early phases; a policy engine for bounded actions later).
 
-## 1. System‑of‑record (who owns what)
+## 1. System‑of‑record (the agent owns everything)
 
-DXM has **no inbound API**, so you can't make it the agent's downstream. Let ownership follow what each system can authoritatively write:
+The agent is the authoritative writer for the Walmart store and owns every domain end‑to‑end:
 
-| Domain | Owner (system of record) | Why |
+| Domain | Owner (system of record) | Notes |
 |---|---|---|
-| **Inventory (ATS)** | **DianXiaoMi** → pushes to Walmart | DXM knows true cross‑channel stock; two writers = oversell |
-| **Price baseline / floor** | **DianXiaoMi** | high blast radius; agent proposes deltas |
-| **Repricing deltas / Buy Box** | **Agent** (Phase 2+) within bounds | where the agent adds value |
-| **Listings / catalog content** | **DianXiaoMi** (agent audits/enriches) | DXM does listing setup |
-| **Order state (fulfillment)** | **DianXiaoMi** | DXM ingests POs, ships, writes tracking |
-| **Walmart event truth / analytics / reconciliation / decisions** | **NEW agent layer** | the gap DXM doesn't fill |
+| **Inventory (ATS)** | **Agent** → pushes to Walmart | the agent owns this end‑to‑end; it pushes available‑to‑sell from your own stock truth (see note below) |
+| **Price baseline / floor** | **Agent** | high blast radius; gated + bounded |
+| **Repricing deltas / Buy Box** | **Agent** within bounds | where the agent adds value |
+| **Listings / catalog content** | **Agent** | the agent owns listing setup, audits, and enrichment |
+| **Order state (fulfillment)** | **Agent** | the agent owns this end‑to‑end: acknowledge, ship (tracking), cancel, refund, returns, WFS |
+| **Walmart event truth / analytics / reconciliation / decisions** | **Agent** | observability + decisions |
 
-**The agent owns observability + decisions, not operational writes.** Replacing DXM would mean rebuilding warehouse/procurement/label/logistics — not worth it.
+**The agent owns all writes — listings, price, inventory, orders, returns, WFS — and is the single system of record for the Walmart store.**
+
+> **Inventory & fulfillment for a standalone agent:** because the agent owns these, it needs (a) a real **source of inventory truth** — your own warehouse/3PL stock counts — to push available‑to‑sell to Walmart, and (b) a way to produce **shipping labels + tracking** (Walmart's carrier/label APIs or a 3PL) to fulfill and ship orders.
 
 ## 2. Event ingestion — webhook + reconciliation hybrid
 
@@ -50,7 +50,7 @@ Walmart webhooks are at‑least‑once, unordered, best‑effort — so pair the
 - **Assume no ordering** — never apply a Buy Box/inventory event blindly; reconcile against current Walmart state first.
 
 **Polling cadences (respect limits):**
-- **Orders** (`GET /v3/orders` ~5000/min): adaptive 30 s–5 min delta poll — but for **reconciliation only** (DXM acts on orders).
+- **Orders** (`GET /v3/orders` ~5000/min): adaptive 30 s–5 min delta poll — the agent ingests POs and drives order state (acknowledge / ship / cancel / refund), with polling also serving reconciliation.
 - **Inventory/price**: read‑back after each write + a periodic full sweep (nightly/few‑hours) diffing live vs expected → emit `drift` events.
 - **Reconciliation sweep** is the safety net for missed/duplicated webhooks: enumerate active offers, diff vs the event ledger, backfill gaps.
 
@@ -73,12 +73,12 @@ submit feed → capture feedId → poll GET /v3/feeds/{feedId}?includeDetails=tr
 
 Treat the agent as a credentialed machine principal that will fire hundreds of tool calls. The tool layer — not the prompt — is where safety is enforced.
 
-- **Separate READ vs WRITE tools.** Production default = **read‑only**; write tools enabled per role/phase. (Read: `get_orders`, `get_returns`, `get_item`, `get_inventory`, `get_price`, `get_buybox_status`, `get_feed_status`, `list_notifications`, `get_reconciliation_drift`. Write: `propose_price_update`, `propose_inventory_update`, `submit_feed`, `request_cancel`.)
+- **Separate READ vs WRITE tools.** Production default = **read‑only**; write tools enabled per role/phase. (Read: `get_orders`, `get_returns`, `get_item`, `get_inventory`, `get_price`, `get_buybox_status`, `get_feed_status`, `list_notifications`, `get_reconciliation_drift`. Write: `update_price`, `update_inventory`, `submit_feed`, `acknowledge_order`, `ship_order`, `cancel_order`, `refund_order`, `manage_return`.)
 - **Dry‑run / preview:** every write tool accepts `dry_run: true` and returns a **diff** (current vs proposed price/qty, affected SKUs, projected Buy Box/margin impact) with no submit. This is the agent's default.
 - **Human‑approval gates:** price/inventory/cancel are gated in Phases 1–2. The write tool returns a `pending_approval` object + one‑time **approval token**; the mutation only fires when a human (later a policy engine) returns that token.
 - **Idempotency at the tool layer:** every write tool **requires** a client idempotency key; duplicate key → original result, never a second feed.
 - **Audit logging:** structured logs w/ correlation IDs for every tool call — tool, args (secrets/PII redacted), dry‑run vs live, approval token + approver, latency, success/failure, `feedId`, per‑item outcome. Answer "which agent, on whose authority, changed what, and was it approved." Retain through return/dispute windows.
-- **Least privilege:** give the agent a **scoped Solution‑Provider credential** (or, for your own shop, your own keys but with the agent's tool layer *excluding* order acknowledge/ship/cancel so it structurally cannot collide with DXM's fulfillment).
+- **Least privilege:** give the agent **your own first‑party API keys** (no Connected App or partnership needed) and scope the tool layer to exactly the writes it should own per phase. Enable higher‑blast‑radius tools (cancel, bulk inventory, new listings) only as the rollout advances.
 
 ## 5. Secrets / token management
 
@@ -86,14 +86,11 @@ Treat the agent as a credentialed machine principal that will fire hundreds of t
 - Store `client_id`/`secret`/refresh tokens in a **dedicated secrets manager** — never env files or the agent's prompt/context. The MCP server reads them; the agent never sees raw credentials.
 - **Rotation:** rotate on schedule + on suspected compromise; support overlapping old+new validity so in‑flight refreshes don't fail.
 
-## 6. Avoiding double‑writes / conflicts with DXM
+## 6. Single source of truth
 
-1. **Field‑level ownership partition (no overlap):** DXM owns inventory + order‑state writes; the agent owns only price‑delta/Buy‑Box writes (Phase 2+). Never both on the same field.
-2. **Credential/tool scope as the hard wall:** make the agent's tools *incapable* of writing DXM‑owned fields. Policy in the prompt is advisory; a missing tool/scope is a wall.
-3. **Conflict tripwire:** subscribe to Buy Box / Offer / price‑change events; if the agent writes price Y and then sees DXM push X back within minutes, raise a **conflict alert** and suspend agent writes on that SKU until a human decides.
-4. **Read‑before‑write + verification read‑back** (the phantom‑success pattern).
-5. **Per‑SKU cooldowns** so the agent can't contend with DXM's sync cycle.
-6. Because DXM can't be told what the agent did, prefer **propose‑to‑human** for any field DXM actively syncs; reserve direct agent writes for domains DXM leaves alone (e.g. promotional price within an agreed band) or the native Repricer.
+**The agent is the system of record for Walmart writes.** (Optional: if you ever add another tool that also writes to Walmart, partition fields per system to avoid oversell / double‑write / price‑flapping.)
+
+Still apply the write‑safety basics regardless: **read‑before‑write + verification read‑back** (the phantom‑success pattern) and **per‑SKU cooldowns** so a write cycle can't contend with itself.
 
 ## 7. Phased rollout
 
@@ -101,20 +98,20 @@ Treat the agent as a credentialed machine principal that will fire hundreds of t
 |---|---|---|
 | **0 — Foundation** | OAuth client (scoped), token cache + proactive refresh, webhook receiver (verify + dedup + durable write), event ledger, canonical entity map, reconciliation sweep, MCP server **READ tools only** | none |
 | **1 — Read‑only analytics** | Buy‑Box‑loss diagnosis, OOS/return trends, pricing/margin recommendations, scorecard + reconciliation reports. Write tools exist only in `dry_run` (diffs a human reviews) | none (dry‑run only) |
-| **2 — Human‑in‑the‑loop writes** | Enable write tools behind **approval tokens** (price‑delta, targeted inventory correction, feed submit, listing fixes). Conflict tripwires + full audit on. Agent proposes → human approves → submit → read‑back confirms | gated |
+| **2 — Human‑in‑the‑loop writes** | Enable write tools behind **approval tokens** (price‑delta, targeted inventory correction, feed submit, listing fixes, order state). Full audit on. Agent proposes → human approves → submit → read‑back confirms | gated |
 | **3 — Supervised autonomy** | For **low‑blast‑radius** actions (reprice within a pre‑approved margin/price band + SKU allowlist), a **policy engine** auto‑issues the approval token when hard guardrails pass. Cancels, large inventory changes, new listings stay **human‑gated indefinitely**. Global kill‑switch + per‑SKU circuit breakers revert to Phase 2 on anomaly | bounded auto |
 
-**Mapping to your 4 workflows:** order/inventory monitoring + analytics land in **Phase 1**; repricing‑via‑native‑Repricer and listing fixes graduate to **Phase 2**; bounded repricing within a band reaches **Phase 3**. Inventory writes stay with DXM throughout.
+**Mapping to your 4 workflows:** order/inventory monitoring + analytics land in **Phase 1**; repricing and listing fixes graduate to **Phase 2**; bounded repricing within a band reaches **Phase 3**. Order‑state and inventory writes are owned by the agent and gated through Phase 2, with only low‑blast‑radius actions auto‑issued in Phase 3.
 
 ## 8. Suggested component checklist (Phase 0–1)
 
 - [ ] Secret manager holding Client ID/Secret; token service with proactive refresh + single‑flight.
 - [ ] Walmart API client (typed) with 429 handling (read replenish headers) + retry/backoff.
 - [ ] Webhook receiver (HTTPS, signature verify, `eventId` dedup, durable write, 2xx‑after‑persist) — validate with **Test Notification API**.
-- [ ] Event ledger (append‑only) + canonical entity map `(walmart_sku, gtin/upc, walmart_item_id, dxm_sku, internal_offer_id)` bootstrapped from `GET /v3/items`.
+- [ ] Event ledger (append‑only) + canonical entity map `(walmart_sku, gtin/upc, walmart_item_id, internal_offer_id)` bootstrapped from `GET /v3/items`.
 - [ ] Reconciliation sweep job (nightly diff live vs expected → drift events).
 - [ ] MCP/tool server exposing READ tools; WRITE tools present but `dry_run`‑only with approval scaffolding.
 - [ ] Audit log store with correlation IDs.
-- [ ] Dashboards/alerts for SLA risk, scorecard thresholds, drift, dead‑letter, conflicts.
+- [ ] Dashboards/alerts for SLA risk, scorecard thresholds, drift, dead‑letter.
 
-See `05` for the guardrails these tools must enforce, and `06` for the DXM entity‑map bootstrap.
+See `05` for the guardrails these tools must enforce.

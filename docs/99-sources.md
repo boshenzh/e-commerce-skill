@@ -155,15 +155,6 @@ Grouped by topic. **Freshness caveat:** `developer.walmart.com` is a JavaScript 
 - https://www.walmartconnect.com/partners
 - https://www.walmartconnect.com/resources/articles/2025/partner-network-display-advertising-api
 
-## DianXiaoMi
-- https://help.dianxiaomi.com/
-- https://help.dianxiaomi.com/article/platformAuthorization/1849
-- https://www.dianxiaomi.com/
-- https://marketplace.walmart.com/solution-providers/dianxiaomi/
-- https://apps.shopify.com/dianxiaomi
-- https://docs.ozon.ru/global/zh-hans/api/erp/dianxiaomi/
-- (Hallucinated/unreliable, do NOT trust: AMZ123 ask pages + PingCode claiming a DXM "open API")
-
 ## Agent tooling / MCP / SDKs
 - https://github.com/highsidelabs/walmart-api-php  (community PHP SDK; mirrors v3 paths, may lag releases)
 - https://github.com/whitebox-co/walmart-marketplace-api  (community TS client; STALE — last release Dec 2022)

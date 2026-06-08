@@ -46,7 +46,7 @@ There is an **international-seller path**, but it is **stricter** (more document
    export WALMART_ENV="production"   # or sandbox
    ```
    Validate the creds immediately: `python3 ../walmart-seller/scripts/get_token.py`.
-6. **(Optional) Connect a solution provider** (e.g. **DianXiaoMi**) by browsing **Seller Center → Apps → App Store → Connect** via **OAuth** — you authorize them, you do **not** paste your secret to them. Manage/renew/revoke them afterward under **Connected Apps** (`seller.walmart.com/apps/connected-apps`). See gotcha #4.
+6. **(Optional) Connect a solution provider** by browsing **Seller Center → Apps → App Store → Connect** via **OAuth** — you authorize them, you do **not** paste your secret to them. Manage/renew/revoke them afterward under **Connected Apps** (`seller.walmart.com/apps/connected-apps`). See gotcha #4.
 
 ## Working example — validate keys the moment you have them
 
@@ -67,7 +67,7 @@ If this returns a token, onboarding-to-API is done — everything else (items, p
 1. **API KEYS ≠ APPROVAL TO SELL.** Generating keys is instant and self-serve; getting *approved to sell* is a Walmart review that can be **rejected**. Don't tell the user "you're in" just because the developer portal showed a key pair — that step only exists *after* approval.
 2. **You generally need a real US entity + Tax ID** (EIN, W-9, US address). The international path exists but is stricter; don't promise approval without it.
 3. **Approval favors a strong catalog + fulfillment story.** A thin catalog or vague fulfillment plan is the common rejection cause. Lead with proven e-commerce track record and a clear seller-fulfilled-or-WFS plan.
-4. **Never share your `Client Secret` with a provider.** Authorize DianXiaoMi (or any ERP) by browsing **Seller Center → Apps → App Store → Connect** via **OAuth**, which grants scoped access without exposing your first-party secret; manage/renew/revoke them under **Connected Apps** (`seller.walmart.com/apps/connected-apps`). Your own keys stay yours.
+4. **Never share your `Client Secret` with a provider.** Authorize any solution provider by browsing **Seller Center → Apps → App Store → Connect** via **OAuth**, which grants scoped access without exposing your first-party secret; manage/renew/revoke them under **Connected Apps** (`seller.walmart.com/apps/connected-apps`). Your own keys stay yours.
 5. **2026 access change:** legacy **Delegated Access** keys retire **2026-10-01** (no *new* delegated keys after **2026-07-30**). Your **own first-party keys are unaffected** — this is the path to use. Detail: [`../walmart-seller/references/access-and-auth.md`](../walmart-seller/references/access-and-auth.md).
 
 ## Load deeper

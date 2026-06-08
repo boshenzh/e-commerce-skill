@@ -1,6 +1,6 @@
 ---
 name: walmart-seller
-description: "Hub skill for operating a Walmart Marketplace (US) seller store as an agent. Owns the shared machinery every other walmart-* skill depends on: ACCESS & AUTH (use the seller's OWN first-party API keys — no Walmart approval needed; OAuth2 client_credentials → 15-min token), a condensed API map (items/inventory/price/orders/returns/WFS/reports/notifications), the ACCOUNT-SAFETY GUARDRAILS (scorecard thresholds + pricing-suppression rules + hard write invariants), and runnable Python helpers (get_token, wm_request, guardrail_check). Routes to the right spoke skill for a task. Use FIRST whenever the user wants to do anything on Walmart Marketplace: 'connect my Walmart shop', 'get a Walmart API token', 'call the Walmart marketplace API', 'reprice on Walmart', 'is this price safe', 'manage my Walmart store', '沃尔玛卖家', '连接沃尔玛店铺'. Sits ALONGSIDE an ERP like DianXiaoMi (which owns inventory push + fulfillment) — do not duplicate its writes."
+description: "Hub skill for operating a Walmart Marketplace (US) seller store as an agent. The agent is the system of record for the Walmart store and owns ALL writes end-to-end: listings, price, inventory, orders, returns, WFS. Owns the shared machinery every other walmart-* skill depends on: ACCESS & AUTH (use the seller's OWN first-party API keys — no Walmart approval needed; OAuth2 client_credentials → 15-min token), a condensed API map (items/inventory/price/orders/returns/WFS/reports/notifications), the ACCOUNT-SAFETY GUARDRAILS (scorecard thresholds + pricing-suppression rules + hard write invariants), and runnable Python helpers (get_token, wm_request, guardrail_check). Routes to the right spoke skill for a task. Use FIRST whenever the user wants to do anything on Walmart Marketplace: 'connect my Walmart shop', 'get a Walmart API token', 'call the Walmart marketplace API', 'reprice on Walmart', 'is this price safe', 'manage my Walmart store', '沃尔玛卖家', '连接沃尔玛店铺'."
 author: "boshenzh"
 license: "Apache-2.0"
 version: "0.1.0"
@@ -22,9 +22,8 @@ This is the entry point for everything on Walmart Marketplace (US). Read this fi
 
 ## When to use / when not to
 
-- **Use** for any Walmart seller operation: authenticating, calling the API, repricing, listing, fulfilling, researching products, checking account safety.
+- **Use** for any Walmart seller operation: authenticating, calling the API, repricing, listing, fulfilling, researching products, checking account safety. The agent is the **system of record** for the Walmart store and owns **all writes** end‑to‑end — listings, price, inventory, orders (acknowledge/ship/cancel/refund), returns, WFS.
 - **Not** for Walmart **advertising** programmatically beyond planning — the ads API is partner‑gated (`walmart-advertising`). Not for **consumer** Walmart shopping (this is the seller side).
-- **Coexistence:** the user runs **DianXiaoMi (DXM)**, which owns inventory push + order fulfillment. This agent layer is **read‑mostly** and writes to Walmart only through narrow, guarded paths (price/listing/Buy Box) or Walmart's native Repricer. Never routinely acknowledge/ship orders or push inventory from here — that double‑fulfills/oversells. See `../../docs/06-dianxiaomi-and-data-flow.md`.
 
 ## Access model (do this once)
 
@@ -83,21 +82,22 @@ API endpoint quick‑reference for any of these: `references/api-reference.md`.
 
 ## Global safety rules (non‑negotiable — full text in `references/guardrails.md`)
 
-Any **write** the agent makes must respect these, or it risks SKU suppression or account suspension:
+The agent is the **system of record** for the Walmart store and owns **every write** end‑to‑end. Any write must respect these, or it risks SKU suppression or account suspension:
 
 1. **Price has hard bounds.** Never below `max(cost + min_margin, MAP)`; never above the Walmart **reference price** (the de‑facto ceiling). Clamp to `[min, max]`. Run `scripts/guardrail_check.py` first.
 2. **Too‑low prices get suppressed too** (reason "Pricing Error"), not just too‑high ("Reasonable Price Not Satisfied"). A runaway downward repricer is dangerous.
 3. **Cap per‑cycle change** (e.g. ≤15%); larger moves need human approval. **Cooldowns** per SKU. Walmart's own engine runs ~4‑hr cadence — don't thrash.
 4. **Respect rate limits** (price single 100/hr, bulk feeds 10/hr, order actions 60/min); on `429` back off using `x-next-replenish-time` (handled by `wm_request.py`).
-5. **Don't fight DXM.** Don't write fields DXM owns (inventory, order ack/ship). Prefer propose‑to‑human for anything DXM also syncs.
+5. **Single source of truth — the agent is the system of record for Walmart writes.** (Optional: if you ever add another tool that also writes to Walmart, partition fields per system to avoid oversell / double‑write / price‑flapping.)
 6. **Content compliance** before any listing write (no marketing claims/symbols in titles, English‑only, IP‑owned, not a prohibited category).
 7. **Kill‑switch + audit.** Freeze all writes on anomaly (unpublish spike, 429 storm); log every write + the data behind it for Plan‑of‑Action appeals.
 8. **Feed writes are async + can lie:** `feedStatus=PROCESSED` ≠ item live, and a `200` may not have applied. Always **poll per‑item status, then read back** ~60 s later.
 
+Because the agent now owns inventory + fulfillment, it needs two things of its own: **(a)** a real source of inventory truth — your own warehouse/3PL stock — to push to Walmart, and **(b)** a way to produce shipping labels + tracking (Walmart's carrier/label APIs or a 3PL).
+
 ## Gotchas
 
-- **"Connected Apps" ≠ how you build this.** Connected Apps are third‑party OAuth tools (DXM is one). Your in‑house agent uses your own keys directly — no App Store listing. (`references/access-and-auth.md`.)
-- **DianXiaoMi has no open API** — you cannot drive it programmatically. Integrate at the Walmart layer. (`../../docs/06`.)
+- **"Connected Apps" ≠ how you build this.** Connected Apps are third‑party OAuth tools. Your in‑house agent uses your own keys directly — no App Store listing. (`references/access-and-auth.md`.)
 - **Token TTL is 15 minutes.** Stale‑token 401s are the #1 integration bug — cache + proactively refresh.
 - **Scripts use Python stdlib only** (`urllib`), so they run anywhere with `python3`; no `pip install` needed.
 - **developer.walmart.com is a JS SPA** — exact field spellings/limits can drift; confirm against a live sandbox call (`references/api-reference.md` flags the uncertain ones).

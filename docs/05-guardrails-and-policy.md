@@ -2,6 +2,8 @@
 
 Walmart enforces pricing and content rules largely through **automated suppression**, not warnings, and governs account health through a **performance scorecard**. An autonomous agent that ignores these can get SKUs unpublished or the account suspended. This chapter is the rulebook the agent's write path **must** hard‑enforce.
 
+The agent is the **system of record** for this Walmart store and owns **all writes** end‑to‑end: listings, price, inventory, orders (acknowledge / ship / cancel / refund), returns, and WFS. Because it owns inventory, it needs a **real source of inventory truth** — your own warehouse/3PL stock — to push to Walmart (otherwise availability and the too‑low/oversell hazards can't be controlled).
+
 ## 1. Seller performance scorecard (thresholds)
 
 Current official "Seller performance standards" (Marketplace Learn, fetched June 2026):
@@ -19,7 +21,7 @@ Current official "Seller performance standards" (Marketplace Learn, fetched June
 
 > Notes: "Order Defect Rate (ODR) < 2% over 90 days" is **legacy** terminology — the current page no longer lists ODR or a 90‑day window; it's been replaced by the granular metrics above. Some third‑party blogs still cite an older **OTD > 95%** — the live official figure is **90%**. There's **no single auto‑suspend cutoff**: failing any standard "may result in suppression, suspension or termination," usually after ≥1 warning, with appeals via a corrective plan.
 
-**Agent implication:** continuously monitor these via the Seller Performance API and **alert before** a metric approaches its threshold. The order‑sync automation (`03` Priority 1) exists largely to protect OTD/VTR/Cancellation.
+**Agent implication:** continuously monitor these via the Seller Performance API and **alert before** a metric approaches its threshold. The agent owns order sync end‑to‑end (acknowledge / ship / cancel / refund; see `03` Priority 1) largely to protect OTD/VTR/Cancellation. Because the agent owns fulfillment, it needs a reliable way to produce **shipping labels + tracking** — Walmart's carrier/label APIs or a 3PL — so every shipment posts valid tracking inside the OTD/VTR window.
 
 ## 2. Pricing Rule (automated suppression) — the big hazard
 
@@ -66,7 +68,8 @@ Encode these as non‑negotiable checks in the repricing/listing write path. The
 5. **Cooldowns + rate budgeting.** Respect 100/hr·10/hr·60/min; honor the 10 shipping‑template‑edits/day lockout; back off on 429 via `X-Next-Replenishment-Time`. Walmart's own engine runs ~4‑hr cadence — don't thrash.
 6. **Human‑approval gate** for large moves and any price below cost/MAP — hard stops, never auto‑override.
 7. **Global kill‑switch** freezing all writes on anomaly (spike in unpublished SKUs, 429 storm, reference‑price data gaps) + **per‑SKU circuit breakers**.
-8. **SKU allowlist** — everything else read‑only by default. One strategy/owner per SKU (no conflicting writes; see DXM conflict tripwire in `04`).
+8. **SKU allowlist** — everything else read‑only by default. One strategy/owner per SKU (no conflicting writes).
+   - **Single source of truth** — the agent is the system of record for Walmart writes. (Optional: if you ever add another tool that also writes to Walmart, partition fields per system to avoid oversell / double‑write / price‑flapping.)
 9. **"No competitive target" → hold last submitted price** (don't free‑fall to min).
 10. **Content‑write validation** (§4) before any item feed.
 11. **Audit + corrective‑action logging** on every change + the reference data behind it, so a Plan of Action can be assembled fast.

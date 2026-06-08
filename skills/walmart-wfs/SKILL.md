@@ -66,7 +66,7 @@ WFS can ship orders from Amazon/eBay/Temu/etc. out of the same WFS stock:
 
 ## Gotchas
 
-- **WFS inventory is READ-ONLY via API.** Never `PUT /v3/inventory` (or `MP_INVENTORY`/`inventory` feeds) for a WFS SKU — Walmart controls those quantities; the only way to add stock is an inbound shipment. Quantity pushes are for **seller-fulfilled** SKUs only. Don't let the DXM inventory sync touch WFS SKUs either.
+- **WFS inventory is READ-ONLY via API.** Never `PUT /v3/inventory` (or `MP_INVENTORY`/`inventory` feeds) for a WFS SKU — Walmart controls those quantities; the only way to add stock is an inbound shipment. Quantity pushes are for **seller-fulfilled** SKUs only — the agent owns those quantity writes end-to-end against its own source of inventory truth (your warehouse/3PL stock). Never run a quantity sync against a WFS SKU.
 - **Fees eat margin on slow movers.** Per-unit fulfillment fee + monthly storage. Long-resident inventory bleeds storage fees — use the inventory health report to flush aging stock before converting more SKUs.
 - **The new Preferred-Carrier booking API supersedes the legacy carrier-rate-quote calls.** Don't build against the old rate-quote endpoints; verify the current Preferred-Carrier paths against a live call.
 - **Sandbox is thin for fulfillment.** Several `/v3/fulfillment/*` endpoints are limited or stubbed on sandbox — verify behavior on production (with a tiny test shipment) before trusting responses.

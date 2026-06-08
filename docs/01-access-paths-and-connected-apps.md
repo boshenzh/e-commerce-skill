@@ -11,12 +11,12 @@ There are **seven** ways an agent/software can touch a Walmart seller account. T
 | **A** | **Your own first‑party API keys** | OAuth2 `client_credentials` (your Client ID/Secret), 15‑min token | **None** beyond being a seller | Full, unrestricted access to **your** account's API | ✅ **Recommended** |
 | B | Approved **Solution Provider** OAuth app (a "Connected App") | OAuth2 `authorization_code` + 1‑yr refresh, scoped | Walmart contract + ~3–5 wk review | Operate **many** sellers who authorize you | Only if you later sell the agent |
 | C | Legacy **Delegated Access** keys | per‑provider Client ID/Secret, granular scopes | provider must already be contracted | Like A but delegated to a 3rd party | ❌ **Retiring** (see §6) |
-| D | *Through* an existing connected app (e.g. DianXiaoMi) | n/a | n/a | Nothing — **DXM has no open API** | ❌ Dead end |
-| E | **Browser / UI automation** of Seller Center or DXM | logged‑in session cookies | none (but ToS‑sensitive) | Anything visible in the UI | ⚠️ Last resort |
+| D | *Through* an existing third‑party connected app/ERP (e.g. an ERP/listing/ads tool) | n/a | n/a | Nothing — **dead end if it exposes no open API** | ❌ Dead end |
+| E | **Browser / UI automation** of Seller Center | logged‑in session cookies | none (but ToS‑sensitive) | Anything visible in the UI | ⚠️ Last resort |
 | F | **3rd‑party hosted MCP / platform** (Vinkius, CedCommerce, ChannelEngine, Linnworks) | the vendor's auth | the vendor's onboarding | Wraps the same API + multichannel | Convenience layer only |
 | G | **Walmart Connect ads** API (Sponsored Search/Display) | partner‑gated | WCPN partner approval | Ad campaigns/reporting — separate from Marketplace | Separate track |
 
-**Bottom line:** automate your own shop with **Path A** (your own keys). Becoming a Connected App (Path B) is for distribution to other sellers. DXM (Path D) can't be driven programmatically.
+**Bottom line:** automate your own shop with **Path A** (your own keys). Becoming a Connected App (Path B) is for distribution to other sellers. A third‑party connected app/ERP (Path D) can't be driven programmatically unless it exposes its own open API.
 
 ## 2. What "Connected Apps" actually is
 
@@ -25,7 +25,7 @@ In Seller Center, under the **Apps** left‑nav heading, there are two related s
 - **App Store / App Listings** — a directory of Walmart‑approved Solution Providers (ERPs, listing/order/inventory/ads tools) you can connect to your account.
 - **Connected Apps** (`seller.walmart.com/apps/connected-apps`) — the list of providers you have **already authorized**, with **Renew** and **Revoke** controls.
 
-**DianXiaoMi is a confirmed approved Walmart Solution Provider** ([listing](https://marketplace.walmart.com/solution-providers/dianxiaomi/)) — categories include Advertising, Full Service, Inventory Management, Item Setup, Order Management, Pricing, Returns, Shipping & Fulfillment. So when you "manage your shop through DianXiaoMi," DXM appears here as one of your OAuth‑authorized Connected Apps.
+Approved providers span categories like Advertising, Full Service, Inventory Management, Item Setup, Order Management, Pricing, Returns, and Shipping & Fulfillment. When you "manage your shop through" a third‑party tool (e.g. an ERP/listing/ads tool), it appears here as one of your OAuth‑authorized Connected Apps.
 
 ### Lifecycle of a connected app
 
@@ -101,13 +101,13 @@ There are three generations of third‑party access; only the newest rolls forwa
 
 **What this means for you:**
 - **Path A (your own first‑party keys) is unaffected** — keep building on it.
-- If DianXiaoMi (or any other connected app) still rides Delegated Access, it must be re‑authorized via **Connect** in the App Store (OAuth 2.0) before the cutoff. **Audit `seller.walmart.com/apps/connected-apps`** and re‑connect anything flagged for migration.
+- If any connected app still rides Delegated Access, it must be re‑authorized via **Connect** in the App Store (OAuth 2.0) before the cutoff. **Audit `seller.walmart.com/apps/connected-apps`** and re‑connect anything flagged for migration.
 
-## 7. Why you can't go "through" DianXiaoMi (Path D)
+## 7. Why you can't go "through" a third‑party connected app (Path D)
 
-DianXiaoMi talks to Walmart via Walmart's official APIs under the hood, but **exposes no open/public API to its own users** — no developer portal, no API reference, no app registration, no outbound webhook. (Confirmed against its help center; AI‑generated SEO pages claiming a DXM "open API with order/product/inventory interfaces" are hallucinated boilerplate — see `06`.)
+Many third‑party tools (ERPs, listing/ads tools) talk to Walmart via Walmart's official APIs under the hood, but **expose no open/public API to their own users** — no developer portal, no API reference, no app registration, no outbound webhook. Always verify against the tool's own help center; AI‑generated SEO pages claiming such tools have an "open API with order/product/inventory interfaces" are often hallucinated boilerplate.
 
-Consequence: "operating through DXM programmatically" collapses into **UI automation of DXM's web app** (Path E) — strictly worse than just calling the Walmart API directly, since you'd be screen‑driving a tool that is itself only calling that API. **Talk to Walmart directly.**
+Consequence: "operating through the tool programmatically" collapses into **UI automation of that tool's web app** (Path E) — strictly worse than just calling the Walmart API directly, since you'd be screen‑driving a tool that is itself only calling that API. **Talk to Walmart directly.**
 
 ## 8. UI / browser automation (Path E) — when and the caveats
 

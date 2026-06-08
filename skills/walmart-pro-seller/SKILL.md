@@ -70,7 +70,7 @@ This is a fulfillment-and-quality problem, not a paperwork problem. Work the met
 
 1. **Tighten fulfillment well above the ≥90% on-time floor (historically ~95%+) + valid tracking.** Route seller-fulfilled orders through `walmart-fulfillment-ops` (acknowledge within the 4-hr SLA, ship before Expected Ship Date, upload tracking). Where possible move SKUs to WFS via `walmart-wfs` — WFS orders are on-time by construction and stabilize the on-time metric fastest.
 2. **Drive Listing Quality** with `walmart-seo` (content completeness, images, attributes, ratings) on your trending/high-traffic items.
-3. **Keep cancellations < 1%** by keeping inventory accurate so you never cancel for OOS. This is mostly a DXM-side inventory job — don't write inventory from the agent (hub rule 12 (Don't fight DXM)).
+3. **Keep cancellations < 1%** by keeping inventory accurate so you never cancel for OOS. The agent owns inventory end-to-end: push stock from your own source of inventory truth (your warehouse/3PL on-hand) to Walmart so listings never show more than you can ship (hub rule 12 (single source of truth)).
 4. **Sustain order volume** above the minimum across the window; don't let it dip right before a 5th/20th refresh.
 5. **Stay clean** — no pricing suppressions or content flags. Before ANY price write, read [`../walmart-seller/references/guardrails.md`](../walmart-seller/references/guardrails.md) and run `../walmart-seller/scripts/guardrail_check.py`. A "Pricing Error" suppression both hurts the account and disqualifies the badge.
 
@@ -83,7 +83,7 @@ python3 ../walmart-seller/scripts/wm_request.py GET <pro-seller-status-endpoint>
 
 # 2) Compare each metric to the bar, e.g.:
 #    on-time 93%  -> above the >=90% floor but short of the badge bar (~95%+) -> action: move top SKUs to WFS (walmart-wfs)
-#    cancel  1.4% -> above the badge bar (very low / ~<1%) -> action: fix inventory accuracy (DXM side)
+#    cancel  1.4% -> above the badge bar (very low / ~<1%) -> action: fix inventory accuracy (push accurate stock from your warehouse/3PL truth)
 #    tenure  120d -> PASS
 #    LQ      low  -> action: walmart-seo
 # 3) Tell the seller the gap + that status only re-rates on the 5th/20th.

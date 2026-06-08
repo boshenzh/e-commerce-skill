@@ -40,7 +40,9 @@ Walmart computes an internal **reference price** (competitors + Walmart.com + hi
 9. **No competitive target → hold last submitted price** (don't free‑fall to min).
 10. **Content validation before any listing write** (§ below).
 11. **Audit every change** + the data behind it (for Plan‑of‑Action appeals).
-12. **Don't fight DXM.** Don't write inventory/order‑state (DXM owns them); prefer propose‑to‑human for any field DXM syncs; conflict tripwire if DXM reverts your price.
+12. **Single source of truth** — the agent is the system of record for Walmart writes (listings, price, inventory, orders, returns, WFS). *(Optional: if you ever add another tool that also writes to Walmart, partition fields per system to avoid oversell / double‑write / price‑flapping.)*
+
+> **Owning inventory + fulfillment (standalone).** Because the agent owns these end‑to‑end, it needs (a) a real source of inventory truth — your own warehouse/3PL stock — to push to Walmart, and (b) a way to produce shipping labels + tracking (Walmart's carrier/label APIs or a 3PL) when acknowledging/shipping orders.
 
 ## Content rules (for listing writes)
 
