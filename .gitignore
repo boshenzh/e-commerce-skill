@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Local secrets / env — NEVER commit Walmart keys
+.env
+*.env
+wm_token_*.json
