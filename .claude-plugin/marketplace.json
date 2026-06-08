@@ -22,10 +22,7 @@
         "seller",
         "api"
       ],
-      "source": {
-        "source": "github",
-        "repo": "boshenzh/e-commerce-skill"
-      }
+      "source": "./"
     }
   ]
 }
